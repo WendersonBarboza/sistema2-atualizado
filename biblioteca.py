@@ -5,6 +5,7 @@ import os
 import subprocess
 from datetime import datetime
 from PIL import Image, ImageTk
+import re
 
 # --- VARIÁVEIS GLOBAIS ---
 df_global = None # DataFrame em memória para acesso rápido
@@ -23,11 +24,18 @@ def inicializar_dados():
     pass
 
 def validar_data(data_str):
-    if not data_str: return True
-    try:
-        datetime.strptime(data_str, '%d/%m/%Y')
+    if not data_str:
         return True
-    except ValueError: return False
+    s = str(data_str).strip()
+    # Exige exatamente DD/MM/AAAA com dois dígitos para dia e mês
+    if not re.match(r'^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/[0-9]{4}$', s):
+        return False
+    try:
+        # Validação de calendário (ex.: rejeita 31/02/2024)
+        datetime.strptime(s, '%d/%m/%Y')
+        return True
+    except ValueError:
+        return False
 
 def salvar_dados(tipologia, entries, obs_text):
     """Coleta, valida e salva os dados em sua respectiva planilha de tipologia."""
@@ -309,6 +317,10 @@ def editar_registro():
         novos_dados = {e['label']: e['widget'].get() for e in edit_entries}
         novos_dados['Tipologia'] = edit_tipologia_var.get()
         novos_dados['Observação'] = edit_obs_text.get("1.0", tk.END).strip()
+        # Validação de data com formato DD/MM/AAAA
+        if not validar_data(novos_dados.get('Data')):
+            messagebox.showwarning("Atenção", "Formato de data inválido. Use DD/MM/AAAA.", parent=edit_window)
+            return
 
         original_registro = item_values.get('Registro')
         original_tipologia = item_values.get('Tipologia')
