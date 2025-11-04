@@ -1,11 +1,13 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 import pandas as pd
 import os
 import subprocess
 from datetime import datetime
 from PIL import Image, ImageTk
 import re
+import sys
+import hashlib
 
 # --- VARIÁVEIS GLOBAIS ---
 df_global = None # DataFrame em memória para acesso rápido
@@ -17,6 +19,43 @@ def get_filename_for_tipologia(tipologia):
     return f'biblioteca_{safe_name}.xlsx'
 
 # --- FUNÇÕES ---
+def _license_file_path():
+    base = os.getenv('APPDATA') or os.path.expanduser('~')
+    folder = os.path.join(base, 'BibliotecaApp')
+    os.makedirs(folder, exist_ok=True)
+    return os.path.join(folder, 'license.dat')
+
+def _license_valid():
+    path = _license_file_path()
+    if not os.path.exists(path):
+        return False
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            content = f.read().strip()
+        return content == hashlib.sha256(b'1480').hexdigest()
+    except Exception:
+        return False
+
+def _request_activation(parent):
+    for _ in range(3):
+        pwd = simpledialog.askstring('Ativação', 'Digite a senha para ativar:', show='*', parent=parent)
+        if pwd is None:
+            break
+        if hashlib.sha256(pwd.encode('utf-8')).hexdigest() == hashlib.sha256(b'1480').hexdigest():
+            try:
+                with open(_license_file_path(), 'w', encoding='utf-8') as f:
+                    f.write(hashlib.sha256(b'1480').hexdigest())
+            except Exception:
+                pass
+            return True
+        else:
+            messagebox.showerror('Erro', 'Senha incorreta.', parent=parent)
+    messagebox.showinfo('Saindo', 'Ativação não concluída.')
+    try:
+        parent.destroy()
+    except Exception:
+        pass
+    sys.exit(0)
 def inicializar_dados():
     """Função mantida por compatibilidade, mas a carga de dados agora é feita sob demanda na aba de pesquisa."""
     global df_global
@@ -512,9 +551,12 @@ def create_registration_form(parent_tab, tipologia):
 
 # --- INTERFACE GRÁFICA ---
 app = tk.Tk()
-app.title("Sistema de Catalogação da Biblioteca")
+app.title("Sistema Biblioteca")
 app.geometry("900x700")
 app.configure(bg='white') # Define um fundo branco para a janela principal
+
+if not _license_valid():
+    _request_activation(app)
 
 # --- CABEÇALHO ---
 header_frame = tk.Frame(app, bg='#ff6666')
@@ -530,6 +572,11 @@ try:
     w_size = int(h_size * ratio)
     resized_image = original_image.resize((w_size, h_size), Image.Resampling.LANCZOS)
     logo_image = ImageTk.PhotoImage(resized_image)
+    # Define o ícone da janela com o mesmo logo
+    try:
+        app.iconphoto(True, logo_image)
+    except Exception:
+        pass
     
     logo_label = tk.Label(header_frame, image=logo_image, bg='#ff6666')
     logo_label.image = logo_image # Mantém uma referência
@@ -546,7 +593,7 @@ header_label.pack(expand=True, pady=2) # Padding vertical reduzido
 # --- RODAPÉ ---
 footer_frame = tk.Frame(app, bg='#ff6666', height=30)
 footer_frame.pack(side=tk.BOTTOM, fill=tk.X)
-footer_label = tk.Label(footer_frame, text="Desenvolvido por [ Wenderson Barboza] - 2024", bg='#ff6666', fg='white', font=("Arial", 9))
+footer_label = tk.Label(footer_frame, text="Desenvolvido por Wenderson Barboza - wbs-sp@hotmail.com - 2025", bg='#ff6666', fg='white', font=("Arial", 9))
 footer_label.pack(pady=5)
 
 # --- Abas (Notebook) ---
